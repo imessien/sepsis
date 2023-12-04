@@ -1,41 +1,40 @@
-%This code creates and tests a model of septic risk
-clear;clc;
-%import both clinical data and waveform data
+%import static training data (700 patients) - this is the basis of the simple model
 load('static_data_training.mat');
-load('dynamic_data_training.mat');
+%The header variable contains the meaning of each column of static_train
+%generate simple glm
+%define Y = observations which should be loaded from clinical table
+Y = static_train(:,2);
 
-%%%%
-%generate covariates for complex model
+%define X = covariate matrix by taking features from table. 
+%This currently only uses Gender as a covariate.
+X = static_train(:,4:7); % UPDATES HERE
 
-%preparing a septic/non-septic vector for glmfit
-%note all septic data will be first, followed by all non-septic data
-Y = nan(length(dynamic_train(:,1)),1);
-X = nan(length(dynamic_train(:,1)),11);
-X(:,6:11) = dynamic_train(:,3:8);
-IDs = dynamic_train(:,1);%septic patient ID for each waveform time point
-ID_uni = static_train(:,1);%patient's ID numbers
+%display distributions of each covariate    
+%matlab starts with one not zero
+%disp('Gender distribution:');
+%disp(countcats(categorical(X(:,1))));
 
-%create covariate matrix including both demographic info and waveform data
-for i = 1:length(ID_uni)%for septic data
-    ind = find(IDs==ID_uni(i));
-    X(ind,1:5) = repmat(static_train(i,3:7),length(ind),1);
-    display(num2str(i));
-    Y(ind) = repmat(static_train(i,2),length(ind),1);
-end
 
-%%%%
-%[B,dev,stats] = glmfit(X,Y,'normal');%find model parameters 
-%Phat = 1./(1+exp(-[ones(size(X,1),1) X]*B)); %equivalent way to compute Phat
-%[thresh] = test_performance(Phat, Y, "");
+%disp('Age distribution:');
+%disp(X(:,2));
 
-% Added code to identify parameters to use in model
+%disp('Respiratory comorbidities distribution:');
+%disp(X(:,3));
 
+%disp('Cardiovascular Comorbidities')
+%disp(X(:,4));
+
+%disp('Infection distribution:');
+%disp(X(:,5));
+
+
+% Make first glm fit using logistic distribution
 figure_counter = 1;
 distributions = ["binomial", "normal", "poisson"];
 performances = [];
 
 counter = 1;
-max_display = 100;
+max_display = 30;
 
 for distribution = distributions
     disp("-------- NEW MODEL for...--------")
@@ -58,6 +57,13 @@ for distribution = distributions
     % Calculate confidence intervals for coefficients
     lower_bound = B - t_critical * SE;
     upper_bound = B + t_critical * SE;
+
+    disp("coefficient estimates:");
+    disp(B);
+    disp("lower bounds:");
+    disp(lower_bound);
+    disp("upper bounds:");
+    disp(upper_bound);
     
     p_values = stats.p;
     disp("p-values...");
@@ -77,7 +83,7 @@ for distribution = distributions
     ylim([0.0, 1.0]);
     hold on;
 
-    saveas(gcf, strcat(distribution, "_dynamic_finalized_preds.png"))
+    saveas(gcf, strcat(distribution, "_finalized_preds.png")) % UPDATES HERE
     
     figure_counter = figure_counter + 1;
 
@@ -92,9 +98,11 @@ for distribution = distributions
     %ylim([0.0, 1.0]);
     %figure_counter = figure_counter + 1;
 
-    [threshold] = test_performance(Phat, Y, strcat(distribution, "_dynamic"));
+    [threshold] = test_performance(Phat, Y, distribution);
     disp("threshold...");
     disp(threshold);
     performances(counter) = threshold;
     counter = counter + 1;
 end
+
+

@@ -10,67 +10,90 @@ Y = static_train(:,2);
 X = static_train(:,3:7);
 
 %display distributions of each covariate    
-
-disp('Gender distribution:');
-disp(countcats(categorical(X.Gender)));
-
-disp('Age distribution:');
-disp(X.Age);
-
-disp('Respiratory comorbidities distribution:');
-disp(countcats(categorical(X.RespitoryComorbidities)));
-
-disp('Heart comorbidities distribution:');
-disp(countcats(categorical(X.HeartComorbidities)));
-
-disp('Infection distribution:');
-disp(countcats(categorical(X.Infection)));
+%matlab starts with one not zero
+%disp('Gender distribution:');
+%disp(countcats(categorical(X(:,1))));
 
 
+%disp('Age distribution:');
+%disp(X(:,2));
+
+%disp('Respiratory comorbidities distribution:');
+%disp(X(:,3));
+
+%disp('Cardiovascular Comorbidities')
+%disp(X(:,4));
+
+%disp('Infection distribution:');
+%disp(X(:,5));
 
 
+% Make first glm fit using logistic distribution
+figure_counter = 1;
+distributions = ["binomial", "normal", "poisson"];
+performances = [];
+
+counter = 1;
+max_display = 30;
+
+for distribution = distributions
+    disp("-------- NEW MODEL for...--------")
+    disp(distribution)
+    disp("---------------------------------")
+    [B,dev,stats] = glmfit(X,Y, distribution);
+    %construct phat from parameters and X 
+    Phat = 1./(1+exp(-[ones(size(X,1),1) X]*B)); %equivalent way to compute Phat
+    %Phat is the estimated probability of sepsis occurence for patients
+    dev = sum(stats.resid.^2)/stats.dfe;
+    disp(['Deviance: ', num2str(dev)]);
+    
+    %B is the coeffiencients 
+    % Get standard errors of the coefficients from the stats structure
+    SE = sqrt(diag(stats.covb)); % Standard errors of coefficients
+    
+    alpha = 0.05; % 95% confidence level
+    t_critical = tinv(1 - alpha / 2, stats.dfe); % t-distribution critical value
+    
+    % Calculate confidence intervals for coefficients
+    lower_bound = B - t_critical * SE;
+    upper_bound = B + t_critical * SE;
+    
+    p_values = stats.p;
+    disp("p-values...");
+    disp(p_values);
+    
+    %Phat_UB = Phat + 1.96*stats.se;
+    %Phat_LB = Phat - 1.96*stats.se;
+    Phat_UB = 1./(1+exp(-[ones(size(X,1),1) X]*upper_bound));
+    Phat_LB = 1./(1+exp(-[ones(size(X,1),1) X]*lower_bound));
+    
+    figure(figure_counter);
+    plot(Phat(1:max_display));
+    hold on;
+    plot(Phat_LB(1:max_display));
+    hold on;
+    plot(Phat_UB(1:max_display));
+    ylim([0.0, 1.0]);
+    hold on;
+    
+    figure_counter = figure_counter + 1;
+
+    %figure(figure_counter);
+    %plot(Phat(1:max_display));
+    %hold on;
+    %plot(Phat_LB(1:max_display));
+    %hold on;
+    %plot(Phat_UB(1:max_display));
+    %hold on;
+    %plot(Y(1:max_display))
+    %ylim([0.0, 1.0]);
+    %figure_counter = figure_counter + 1;
+
+    [threshold] = test_performance(Phat, Y, distribution);
+    disp("threshold...");
+    disp(threshold);
+    performances(counter) = threshold;
+    counter = counter + 1;
+end
 
 
-
-
-
-
-
-%compute glm
-
-
-
-
-
-[B,dev,stats] = glmfit(X,Y,'binomial');
-%construct phat from parameters and X 
-Phat = 1./(1+exp(-[ones(size(X,1),1) X]*B)); %equivalent way to compute Phat
-%Phat is the estimated probability of sepsis occurence for patients
-
-
-%plot phat versus patient along with its confidence bounds (1.96*stats.se)
-Phat_CI = 1.96*stats.se;
-figure(2)
-errorbar(1:length(Phat), Phat, Phat_CI, 'b')
-hold on
-plot(Y(1:30),'r*')
-title('Models for Each Patient')
-% % Phat_LB = Phat - Phat_CI;
-
-% plot first 30 patients prediction, uncertainty and labels.
-figure(1)
-plot(Phat(1:30))
-hold on
-% plot(Phat_LB,'b-')
-% hold on
-% plot(Phat_UB,'b-')
-% hold on
-plot(Y(1:30),'r*')
-title('Models for Each Patient')
-
-%test performance of models
-% [threshold] = test_performance(Phat, Y);
-% l=Y;
-% [X,Y,T,AUC] = perfcurve(l,Phat, 1);
-% figure;
-% plot(X,Y)
